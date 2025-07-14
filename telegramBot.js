@@ -1,11 +1,25 @@
 require("dotenv").config();
-const TelegramBot = require("node-telegram-bot-api");
+const express = require("express");
 const { createQR } = require("./whatsappQR");
+const TelegramBot = require("node-telegram-bot-api");
 
-const bot = new TelegramBot(process.env.TG_TOKEN, { polling: true });
+const bot = new TelegramBot(process.env.TG_TOKEN);
+const app = express();
+
+app.use(express.json());
+
+// 🛠️ إعداد Webhook:
+const URL = process.env.RENDER_EXTERNAL_URL || "https://your-render-url.onrender.com";
+bot.setWebHook(`${URL}/bot${process.env.TG_TOKEN}`);
+
+// 📥 استقبال رسائل تيليجرام:
+app.post(`/bot${process.env.TG_TOKEN}`, async (req, res) => {
+    bot.processUpdate(req.body);
+    res.sendStatus(200);
+});
 
 bot.onText(/\/start/, (msg) => {
-    bot.sendMessage(msg.chat.id, "👋 مرحبًا! أرسل رقمك (مع كود الدولة) لتوليد رمز QR لربط واتساب.");
+    bot.sendMessage(msg.chat.id, "👋 مرحبًا! أرسل رقمك لربط واتساب.");
 });
 
 bot.on("message", async (msg) => {
@@ -18,9 +32,14 @@ bot.on("message", async (msg) => {
 
     try {
         const qrImageBuffer = await createQR(chatId, text);
-        await bot.sendPhoto(chatId, qrImageBuffer, { caption: "✅ امسح هذا الكود من واتساب لربط الجلسة." });
+        await bot.sendPhoto(chatId, qrImageBuffer, { caption: "✅ امسح هذا الكود من واتساب." });
     } catch (err) {
         console.error(err);
         bot.sendMessage(chatId, "❌ فشل توليد QR. حاول لاحقًا.");
     }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`🚀 سيرفر البوت يعمل على المنفذ ${PORT}`);
 });
